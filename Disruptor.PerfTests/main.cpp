@@ -4,6 +4,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <fstream>
 
 #include <Disruptor/Disruptor.h>
 #include <Disruptor/RingBuffer.h>
@@ -14,40 +15,43 @@
 
 std::uint64_t GLOBAL_COUNTER = 0;
 std::uint32_t NUM_OF_THREADS = 500;
-std::uint32_t NUM_OF_OPERATIONS_PER_THREAD = 1000;
-std::uint32_t TOTAL_OPERATIONS = NUM_OF_THREADS * NUM_OF_OPERATIONS_PER_THREAD;
+std::uint32_t TOTAL_OPERATIONS = 1500000;
+std::uint32_t NUM_OF_OPERATIONS_PER_THREAD = TOTAL_OPERATIONS / NUM_OF_THREADS;
+std::uint32_t NUM_OF_ELEMENTS_IN_EVENT = 100;
+std::uint32_t RING_BUFFER_SIZE = 4096;
 std::mutex GLOBAL_MUTEX;
+std::ofstream file("/tmp/log.txt", std::ios::out | std::ios::trunc);
 
 struct Event
 {
     std::vector<int> data;
 };
 
-void initializeEvent(Event& evt, size_t size)
+void initializeEvent(Event& evt)
 {
-    evt.data.resize(size);
+    evt.data.resize(NUM_OF_ELEMENTS_IN_EVENT);
 
-    for (int i = 0; i < size; ++i) {
+    for (int i = 0; i < NUM_OF_ELEMENTS_IN_EVENT; ++i) {
         evt.data[i] = i;
     }
 }
 
-void step1(Event& evt)
+void sequence1(Event& evt)
 {
     std::transform(evt.data.begin(), evt.data.end(), evt.data.begin(), [](int val) { return val * 2; });
 }
 
-void step2(Event& evt)
+void sequence2(Event& evt)
 {
     std::for_each(evt.data.begin(), evt.data.end(), [](int& val) { val += 100; });
 }
 
-void step3(Event& evt)
+void sequence3(Event& evt)
 {
     std::sort(evt.data.begin(), evt.data.end());
 }
 
-void step4(Event& evt)
+void sequence4(Event& evt)
 {
     if (evt.data.empty()) return;
 
@@ -58,62 +62,168 @@ void step4(Event& evt)
     }
 }
 
-void step5(Event& evt)
+void sequence5(Event& evt) { sequence1(evt); }
+
+void sequence6(Event& evt) { sequence1(evt); }
+
+void sequence7(Event& evt)
 {
     GLOBAL_MUTEX.lock();
-    GLOBAL_COUNTER++;
 
-    uint64_t cumulativeSum = 0;
-    for (size_t i = 0; i < evt.data.size(); ++i)
-    {
-        cumulativeSum += evt.data[i];
-        evt.data[i] = cumulativeSum / (i + 1); // Update with the running average
-    }
+    GLOBAL_COUNTER++;
+    file << "GLOBAL COUNTER: " << GLOBAL_COUNTER << std::endl;
+    file.flush();
 
     GLOBAL_MUTEX.unlock();
 }
 
+void sequence8(Event& evt) { sequence1(evt); }
 
-class Step1Handler : public Disruptor::IEventHandler<Event>
+void sequence9(Event& evt) { sequence1(evt); }
+
+void sequence10(Event& evt) { sequence1(evt); }
+
+void sequence11(Event& evt) { sequence1(evt); }
+
+void sequence12(Event& evt) { sequence1(evt); }
+
+void sequence13(Event& evt) { sequence1(evt); }
+
+void sequence14(Event& evt) { sequence1(evt); }
+
+void sequence15(Event& evt) { sequence1(evt); }
+
+
+class Sequence1Handler : public Disruptor::IEventHandler<Event>
 {
 public:
     void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
     {
-        step1(evt);
+        sequence1(evt);
     }
 };
 
-class Step2Handler : public Disruptor::IEventHandler<Event>
+class Sequence2Handler : public Disruptor::IEventHandler<Event>
 {
 public:
     void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
     {
-        step2(evt);
+        sequence2(evt);
     }
 };
 
-class Step3Handler : public Disruptor::IEventHandler<Event>
+class Sequence3Handler : public Disruptor::IEventHandler<Event>
 {
 public:
     void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
     {
-        step3(evt);
+        sequence3(evt);
     }
 };
 
-class Step4Handler : public Disruptor::IEventHandler<Event>
+class Sequence4Handler : public Disruptor::IEventHandler<Event>
 {
 public:
     void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
     {
-        step4(evt);
+        sequence4(evt);
     }
 };
 
-class Step5Handler : public Disruptor::IEventHandler<Event>
+class Sequence5Handler : public Disruptor::IEventHandler<Event>
 {
 public:
-    Step5Handler() : running(true)
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence5(evt);
+    }
+};
+
+class Sequence6Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence6(evt);
+    }
+};
+
+class Sequence7Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence1(evt);
+    }
+};
+
+class Sequence8Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence8(evt);
+    }
+};
+
+class Sequence9Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence9(evt);
+    }
+};
+
+class Sequence10Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence10(evt);
+    }
+};
+
+class Sequence11Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence11(evt);
+    }
+};
+
+class Sequence12Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence12(evt);
+    }
+};
+
+class Sequence13Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence13(evt);
+    }
+};
+
+class Sequence14Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    void onEvent(Event& evt, std::int64_t sequence, bool endOfBatch) override
+    {
+        sequence14(evt);
+    }
+};
+
+class Sequence15Handler : public Disruptor::IEventHandler<Event>
+{
+public:
+    Sequence15Handler() : running(true)
     {
     }
 
@@ -121,12 +231,8 @@ public:
     {
         GLOBAL_COUNTER++;
 
-        uint64_t cumulativeSum = 0;
-        for (size_t i = 0; i < evt.data.size(); ++i)
-        {
-            cumulativeSum += evt.data[i];
-            evt.data[i] = cumulativeSum / (i + 1); // Update with the running average
-        }
+        file << "GLOBAL COUNTER: " << GLOBAL_COUNTER << std::endl;
+        file.flush();
 
         if (GLOBAL_COUNTER == TOTAL_OPERATIONS) {
             running = false;
@@ -136,7 +242,7 @@ public:
     void waitEndOfProcessing()
     {
         while (running) {
-
+            std::this_thread::sleep_for(std::chrono::microseconds(10));
         }
     }
 
@@ -149,12 +255,22 @@ void threadFunction()
     for (std::uint32_t i = 0; i < NUM_OF_OPERATIONS_PER_THREAD; ++i)
     {
         Event evt;
-        initializeEvent(evt, 10000);
-        step1(evt);
-        step2(evt);
-        step3(evt);
-        step4(evt);
-        step5(evt);
+        initializeEvent(evt);
+        sequence1(evt);
+        sequence2(evt);
+        sequence3(evt);
+        sequence4(evt);
+        sequence5(evt);
+        sequence6(evt);
+        sequence7(evt);
+        sequence8(evt);
+        sequence9(evt);
+        sequence10(evt);
+        sequence11(evt);
+        sequence12(evt);
+        sequence13(evt);
+        sequence14(evt);
+        sequence15(evt);
     }
 }
 
@@ -186,30 +302,49 @@ void runDisruptorPublisher(std::shared_ptr<Disruptor::disruptor<Event>> disrupto
 {
     for (std::uint32_t j = 0; j < TOTAL_OPERATIONS; ++j) {
         auto nextSequence = disruptor->ringBuffer()->next();  // Reserve the next slot in the ring buffer
-        initializeEvent((*disruptor->ringBuffer())[nextSequence], 10000);
+        initializeEvent((*disruptor->ringBuffer())[nextSequence]);
         disruptor->ringBuffer()->publish(nextSequence);  // Publish the event to make it available to the consumers
     }
 }
 
 void runDisruptor()
 {
-    auto const ringBufferSize = 1024;
     auto eventFactory = []() { return Event(); };
     auto taskScheduler = std::make_shared<Disruptor::ThreadPerTaskScheduler>();
     auto waitStrategy = std::make_shared<Disruptor::BusySpinWaitStrategy>();
-    auto disruptor = std::make_shared<Disruptor::disruptor<Event>>(eventFactory, ringBufferSize, taskScheduler, Disruptor::ProducerType::Single, waitStrategy);
+    auto disruptor = std::make_shared<Disruptor::disruptor<Event>>(eventFactory, RING_BUFFER_SIZE, taskScheduler, Disruptor::ProducerType::Single, waitStrategy);
 
-    auto step1Handler = std::make_shared<Step1Handler>();
-    auto step2Handler = std::make_shared<Step2Handler>();
-    auto step3Handler = std::make_shared<Step3Handler>();
-    auto step4Handler = std::make_shared<Step4Handler>();
-    auto step5Handler = std::make_shared<Step5Handler>();
+    auto sequence1Handler = std::make_shared< Sequence1Handler >();
+    auto sequence2Handler = std::make_shared< Sequence2Handler >();
+    auto sequence3Handler = std::make_shared< Sequence3Handler >();
+    auto sequence4Handler = std::make_shared< Sequence4Handler >();
+    auto sequence5Handler = std::make_shared< Sequence5Handler >();
+    auto sequence6Handler = std::make_shared< Sequence6Handler >();
+    auto sequence7Handler = std::make_shared< Sequence7Handler >();
+    auto sequence8Handler = std::make_shared< Sequence8Handler >();
+    auto sequence9Handler = std::make_shared< Sequence9Handler >();
+    auto sequence10Handler = std::make_shared< Sequence10Handler >();
+    auto sequence11Handler = std::make_shared< Sequence11Handler >();
+    auto sequence12Handler = std::make_shared< Sequence12Handler >();
+    auto sequence13Handler = std::make_shared< Sequence13Handler >();
+    auto sequence14Handler = std::make_shared< Sequence14Handler >();
+    auto sequence15Handler = std::make_shared< Sequence15Handler >();
 
-    disruptor->handleEventsWith(step1Handler)
-        ->then(step2Handler)
-        ->then(step3Handler)
-        ->then(step4Handler)
-        ->then(step5Handler);
+    disruptor->handleEventsWith(sequence1Handler)
+        ->then(sequence2Handler)
+        ->then(sequence3Handler)
+        ->then(sequence4Handler)
+        ->then(sequence5Handler)
+        ->then(sequence6Handler)
+        ->then(sequence7Handler)
+        ->then(sequence8Handler)
+        ->then(sequence9Handler)
+        ->then(sequence10Handler)
+        ->then(sequence11Handler)
+        ->then(sequence12Handler)
+        ->then(sequence13Handler)
+        ->then(sequence14Handler)
+        ->then(sequence15Handler);
 
     taskScheduler->start();
     disruptor->start();
@@ -218,7 +353,9 @@ void runDisruptor()
 
     runDisruptorPublisher(disruptor);
 
-    step5Handler->waitEndOfProcessing();
+    std::cout << "Publisher ended!" << std::endl;
+
+    sequence15Handler->waitEndOfProcessing();
 
     auto end = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
@@ -230,9 +367,26 @@ void runDisruptor()
     taskScheduler->stop();
 }
 
-int main(int, char**)
+int main(int argc, char* argv[])
 {
-    //runThreads();
-    runDisruptor();
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " [thread|disruptor]" << std::endl;
+        return 1;
+    }
+
+    std::string mode = argv[1];
+
+    if (mode == "thread") {
+        std::cout << "Running with Thread Pool..." << std::endl;
+        runThreads();
+    } else if (mode == "disruptor") {
+        std::cout << "Running with Disruptor..." << std::endl;
+        runDisruptor();
+    } else {
+        std::cerr << "Invalid mode: " << mode << std::endl;
+        std::cerr << "Usage: " << argv[0] << " [thread|disruptor]" << std::endl;
+        return 1;
+    }
+
     return 0;
 }
