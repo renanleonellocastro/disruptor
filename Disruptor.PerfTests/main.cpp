@@ -20,7 +20,10 @@ std::uint32_t NUM_OF_OPERATIONS_PER_THREAD = TOTAL_OPERATIONS / NUM_OF_THREADS;
 std::uint32_t NUM_OF_ELEMENTS_IN_EVENT = 100;
 std::uint32_t RING_BUFFER_SIZE = 4096;
 std::mutex GLOBAL_MUTEX;
+std::mutex MUTEX_TO_WRITE_TO_LATENCY_VECTOR;
 std::ofstream file("/tmp/log.txt", std::ios::out | std::ios::trunc);
+std::ofstream latencyResultsFile("latency.txt", std::ios::out | std::ios::trunc);
+std::vector<std::vector<std::int64_t>> LATENCY_VECTOR_IN_US;
 
 struct Event
 {
@@ -92,7 +95,6 @@ void sequence13(Event& evt) { sequence1(evt); }
 void sequence14(Event& evt) { sequence1(evt); }
 
 void sequence15(Event& evt) { sequence1(evt); }
-
 
 class Sequence1Handler : public Disruptor::IEventHandler<Event>
 {
@@ -237,6 +239,9 @@ public:
         if (GLOBAL_COUNTER == TOTAL_OPERATIONS) {
             running = false;
         }
+
+        LATENCY_VECTOR_IN_US[0][sequence] = std::chrono::duration_cast<std::chrono::microseconds>(
+        std::chrono::high_resolution_clock::now().time_since_epoch()).count() - LATENCY_VECTOR_IN_US[0][sequence];
     }
 
     void waitEndOfProcessing()
@@ -250,10 +255,11 @@ private:
     bool running;
 };
 
-void threadFunction()
+void threadFunction(const std::uint32_t& latencyVectorIndex)
 {
     for (std::uint32_t i = 0; i < NUM_OF_OPERATIONS_PER_THREAD; ++i)
     {
+        auto start = std::chrono::high_resolution_clock::now();
         Event evt;
         initializeEvent(evt);
         sequence1(evt);
@@ -271,19 +277,28 @@ void threadFunction()
         sequence13(evt);
         sequence14(evt);
         sequence15(evt);
+        auto end = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+        LATENCY_VECTOR_IN_US[latencyVectorIndex][i] = duration;
     }
 }
 
 void runThreads()
 {
     std::vector<std::thread> threads;
+
+    LATENCY_VECTOR_IN_US.resize(NUM_OF_THREADS);
+
+    for (auto i = 0; i < NUM_OF_THREADS; ++i) {
+        LATENCY_VECTOR_IN_US[i].resize(NUM_OF_OPERATIONS_PER_THREAD);
+    }
     
     auto start = std::chrono::high_resolution_clock::now();
     
     for (std::uint32_t i = 0; i < NUM_OF_THREADS; ++i)
     {
         std::cout << "Starting thread " << i + 1 << std::endl;
-        threads.emplace_back(threadFunction);
+        threads.emplace_back(threadFunction, i);
     }
     
     for (auto& th : threads)
@@ -304,6 +319,8 @@ void runDisruptorPublisher(std::shared_ptr<Disruptor::disruptor<Event>> disrupto
         auto nextSequence = disruptor->ringBuffer()->next();  // Reserve the next slot in the ring buffer
         initializeEvent((*disruptor->ringBuffer())[nextSequence]);
         disruptor->ringBuffer()->publish(nextSequence);  // Publish the event to make it available to the consumers
+        LATENCY_VECTOR_IN_US[0][nextSequence] = std::chrono::duration_cast<std::chrono::microseconds>(
+            std::chrono::high_resolution_clock::now().time_since_epoch()).count();
     }
 }
 
@@ -346,6 +363,9 @@ void runDisruptor()
         ->then(sequence14Handler)
         ->then(sequence15Handler);
 
+    LATENCY_VECTOR_IN_US.resize(1);
+    LATENCY_VECTOR_IN_US[0].resize(TOTAL_OPERATIONS);
+
     taskScheduler->start();
     disruptor->start();
 
@@ -365,6 +385,15 @@ void runDisruptor()
 
     disruptor->shutdown();
     taskScheduler->stop();
+}
+
+void writeLatencyResultsToFile()
+{
+    for (auto& array : LATENCY_VECTOR_IN_US) {
+        for (auto& latency : array) {
+            latencyResultsFile << latency << std::endl;
+        }
+    }
 }
 
 int main(int argc, char* argv[])
@@ -388,5 +417,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
+    writeLatencyResultsToFile();
     return 0;
 }
