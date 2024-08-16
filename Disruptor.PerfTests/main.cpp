@@ -310,6 +310,7 @@ void runThreads()
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     
     std::cout << "Total elapsed time: " << duration.count() << " ms" << std::endl;
+    std::cout << "Throughput: " << TOTAL_OPERATIONS/duration.count() * 1000 << " QPS" << std::endl;
     std::cout << "GLOBAL_COUNTER: " << GLOBAL_COUNTER << std::endl;
 }
 
@@ -381,6 +382,7 @@ void runDisruptor()
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
     
     std::cout << "Total elapsed time: " << duration.count() << " ms" << std::endl;
+    std::cout << "Throughput: " << TOTAL_OPERATIONS/duration.count() * 1000 << " QPS" << std::endl;
     std::cout << "GLOBAL_COUNTER: " << GLOBAL_COUNTER << std::endl;
 
     disruptor->shutdown();
